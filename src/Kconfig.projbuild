@@ -1,0 +1,32 @@
+menu "Project config"
+
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID of access point to connect to
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            WiFi password
+    config ESP_WIFI_MAX_RETRY
+        int "Maximum retry"
+        default 5
+        help
+            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+
+    config SNES_LATCH
+        int "GPIO Output for SNES latch"
+        default "18"
+    config SNES_CLOCK
+        int "GPIO Output for SNES clock"
+        default "9"
+    config SNES_DATA
+        int "GPIO Input for SNES data"
+        default "17"
+    config SNES_DEBOUNCE_MS
+        int "SNES debounce ms"
+        default "100"
+
+endmenu
