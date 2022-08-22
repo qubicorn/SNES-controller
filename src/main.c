@@ -16,6 +16,7 @@ void app_main() {
     // esp_log_level_set("this_module", ESP_LOG_INFO);
 
     nvs_flash_init();
+    esp_wifi_set_ps(WIFI_PS_NONE); // disable power saving
     wifi_init(WIFI_SSID, WIFI_PASSWORD);
 
     while (1) {
