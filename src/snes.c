@@ -36,6 +36,7 @@ char * snes_register_to_binary(int snes_register, char *bin_snes_register) {
     bin_snes_register[i] = snes_register & 1 ? '1' : '0';
     snes_register >>= 1;
   }
+  bin_snes_register[SNES_REGISTER_NUM_BITS] = '\0';
   return bin_snes_register;
 }
 
@@ -51,7 +52,7 @@ int snes_read_controller() {
   if (esp_log_level_get(TAG) >= ESP_LOG_DEBUG) {
       // if any button presses are found, print the whole register
     if (ret != SNES_REGISTER_DEFAULT) {
-      char bin_snes_register[SNES_NUM_BUTTONS];
+      char bin_snes_register[SNES_NUM_BUTTONS+1];
       snes_register_to_binary(ret, bin_snes_register);
       ESP_LOGI(TAG, "controller register: %s", bin_snes_register);
     }
@@ -72,10 +73,12 @@ void snes_loop() {
   last_pressed_register = snes_register;
   
   // print labels for pressed buttons
-  for (uint8_t i = 0; i < SNES_REGISTER_NUM_BITS; ++i) {
-    if ((snes_register & 1) == 0) {
-      ESP_LOGI(TAG, "\e[%im%s\e[0m", 31, SNES_BUTTON_LABELS[i]);
+  if (esp_log_level_get(TAG) >= ESP_LOG_DEBUG) {
+    const int TERM_RED = 31;
+    for (uint8_t i = 0; i < SNES_REGISTER_NUM_BITS; ++i) {
+      if ((snes_register >> i & 1) == 0) {
+        ESP_LOGI(TAG, "\e[%im%s\e[0m", TERM_RED, SNES_BUTTON_LABELS[i]);
+      }
     }
-    snes_register >>= 1;
   }
 }
