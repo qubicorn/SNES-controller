@@ -69,12 +69,15 @@ void gpio_init()
 
 void app_main() {
     // esp_log_level_set("*", ESP_LOG_WARN);
-    // esp_log_level_set("this_module", ESP_LOG_INFO);
-
+    gpio_init();    
     nvs_flash_init();
+    
+    esp_log_level_set("WIFI", ESP_LOG_WARN);
     esp_wifi_set_ps(WIFI_PS_NONE); // disable power saving
     wifi_init();
-    gpio_init();
+    
+    esp_log_level_set("SNES", ESP_LOG_DEBUG);
+    while (1) { snes_loop();}
 
 #if 0
     while (1) {

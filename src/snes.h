@@ -1,4 +1,9 @@
+#pragma once
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "driver/gpio.h"
+#include "esp_log.h"
 
 #define PIN_SNES_LATCH CONFIG_SNES_LATCH
 #define PIN_SNES_CLOCK CONFIG_SNES_CLOCK
@@ -24,7 +29,7 @@ enum snes_btn {
   SNES_BTN_LT,
   SNES_BTN_RT
 };
-const char *SNES_BUTTON_LABLES[SNES_NUM_BUTTONS] = {
+static const char *SNES_BUTTON_LABELS[] = {
   "B",
   "Y",
   "SELECT",
@@ -39,10 +44,9 @@ const char *SNES_BUTTON_LABLES[SNES_NUM_BUTTONS] = {
   "RT"
 };
 
-int snes_register = SNES_REGISTER_DEFAULT;  // holds current button states
-int last_pressed_register = SNES_REGISTER_DEFAULT;  // last buttons pressed
-unsigned long snes_prev_press_ms = 0;
-gpio_config_t io_confs[] = {
+static int snes_register = SNES_REGISTER_DEFAULT;  // holds current button states
+static int last_pressed_register = SNES_REGISTER_DEFAULT;  // last buttons pressed
+static gpio_config_t io_confs[] = {
   {
     .mode = GPIO_MODE_OUTPUT,
     .pin_bit_mask = 1ULL << PIN_SNES_LATCH,
@@ -62,3 +66,5 @@ void snes_gpio_init();
 void snes_pulse_latch();
 void snes_pulse_clock();
 int snes_read_controller();
+char * snes_register_to_binary(int snes_register, char *bin_snes_register);
+void snes_loop();
