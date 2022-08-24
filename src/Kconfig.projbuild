@@ -16,6 +16,12 @@ menu "Project config"
         help
             Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
 
+    config SNES_POLLILNG_RATE
+        int "SNES controller polling rate in microseconds (min. 50us)"
+        default "500"
+    config SNES_LATCH_PULSE_WIDTH
+        int "SNES latch low after microseconds (min. 20us)"
+        default "20"
     config SNES_LATCH
         int "GPIO Output for SNES latch"
         default "18"
@@ -25,8 +31,5 @@ menu "Project config"
     config SNES_DATA
         int "GPIO Input for SNES data"
         default "17"
-    config SNES_DEBOUNCE_MS
-        int "SNES debounce ms"
-        default "100"
 
 endmenu

@@ -4,6 +4,8 @@
 #include <freertos/task.h>
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "rom/ets_sys.h"
 
 #define PIN_SNES_LATCH CONFIG_SNES_LATCH
 #define PIN_SNES_CLOCK CONFIG_SNES_CLOCK
@@ -13,6 +15,8 @@
 #define SNES_REGISTER_DEFAULT 0xfff 
 #define SNES_NUM_BUTTONS 12
 #define SNES_REGISTER_NUM_BITS SNES_NUM_BUTTONS
+#define SNES_POLLILNG_RATE CONFIG_SNES_POLLILNG_RATE
+#define SNES_LATCH_PULSE_WIDTH CONFIG_SNES_LATCH_PULSE_WIDTH
 
 // SNES controller bits
 enum snes_btn {
@@ -44,8 +48,6 @@ static const char *SNES_BUTTON_LABELS[] = {
   "RT"
 };
 
-static int snes_register = SNES_REGISTER_DEFAULT;  // holds current button states
-static int last_pressed_register = SNES_REGISTER_DEFAULT;  // last buttons pressed
 static gpio_config_t io_confs[] = {
   {
     .mode = GPIO_MODE_OUTPUT,
@@ -62,9 +64,9 @@ static gpio_config_t io_confs[] = {
   },
 };
 
-void snes_gpio_init();
-void snes_pulse_latch();
-void snes_pulse_clock();
+int snes_register = SNES_REGISTER_DEFAULT;  // holds current button states
+int last_pressed_register = SNES_REGISTER_DEFAULT;  // last buttons pressed
+
+void snes_init();
+void snes_debug_print_register(int snes_register);
 int snes_read_controller();
-char * snes_register_to_binary(int snes_register, char *bin_snes_register);
-void snes_loop();
