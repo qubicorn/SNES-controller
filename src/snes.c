@@ -1,68 +1,60 @@
 #include "snes.h"
 
 static const char *TAG = "SNES";
+int snes_register = SNES_REGISTER_DEFAULT;
 
-static void latch_low(void *arg)
-{
-    gpio_set_level(PIN_SNES_LATCH, 0);
-    snes_register = snes_read_controller();
-}
-static const esp_timer_create_args_t timer_args_latch_low = {
-    .callback = &latch_low,
-    .name = "snes-latch-low",
-};
-esp_timer_handle_t timer_latch_low;
+#define NUM_TIMERS 1
+TimerHandle_t xTimers[NUM_TIMERS];
 
-static void pulse_latch(void *arg)
-{
-    gpio_set_level(PIN_SNES_LATCH, 1);
-    /* The snes controller's 4021 shift register needs at least a 180ns pulse
-     * width for 5v.
-     *
-     * See Pg. 4 of the datasheet:
-     *   https://www.ti.com/lit/ds/symlink/cd4021b-q1.pdf?ts=1661218995201 */
-    ESP_ERROR_CHECK(esp_timer_start_once(timer_latch_low, SNES_LATCH_PULSE_WIDTH));
-}
-static const esp_timer_create_args_t timer_args_pulse_latch = {
-    .callback = &pulse_latch,
-    .name = "snes-pulse-latch",
-};
-esp_timer_handle_t timer_pulse_latch;
-
-void timer_init()
-{
-    ESP_ERROR_CHECK(esp_timer_create(
-        &timer_args_latch_low,
-        &timer_latch_low
-    ));
-    ESP_ERROR_CHECK(esp_timer_create(
-        &timer_args_pulse_latch,
-        &timer_pulse_latch
-    ));
-    ESP_LOGI(TAG, "latch pulse width configured to %dus resolution",
-        SNES_LATCH_PULSE_WIDTH
-    );
-    ESP_LOGI(TAG, "starting periodic timer with %dus resolution",
-        SNES_POLLILNG_RATE
-    );
-
-    ESP_ERROR_CHECK(esp_timer_start_periodic(timer_pulse_latch, SNES_POLLILNG_RATE));
-}
-
-void snes_pulse_clock()
-{
-    // shift register to next bit to be read
-    gpio_set_level(PIN_SNES_CLOCK, 1);
-    gpio_set_level(PIN_SNES_CLOCK, 0);
-}
 
 void gpio_init()
 {
     size_t num_gpio_confs = sizeof(io_confs) / sizeof(gpio_config_t);
     for (int i = 0; i < num_gpio_confs; ++i) {
-        gpio_config(&io_confs[i]);
+        ESP_ERROR_CHECK(gpio_config(&io_confs[i]));
     }
     ESP_LOGI(TAG, "gpio ports initialized");
+}
+
+void vTimerCallback(TimerHandle_t pxTimer) {
+    snes_register = snes_read_controller();
+}
+
+void timer_init() {
+    for (int32_t i=0; i < NUM_TIMERS; ++i) {
+        xTimers[i] = xTimerCreate("snes_timer",       // Just a text name, not used by the kernel.
+                                  1,         // The timer period in ticks.
+                                  pdTRUE,        // The timers will auto-reload themselves when they expire.
+                                  (void *)i,     // Assign each timer a unique id equal to its array index.
+                                  vTimerCallback // Each timer calls the same callback when it expires.
+        );
+
+        if (xTimers[i] == NULL) {
+            ESP_LOGE(TAG, "Failed to create timer");
+        } else {
+            // Start the timer.  No block time is specified, and even if one was
+            // it would be ignored because the scheduler has not yet been
+            // started.
+            if (xTimerStart(xTimers[i], 0) != pdPASS) {
+                ESP_LOGE(TAG, "Failed to activate timer");
+            }
+        }
+    }
+}
+
+void pulse_latch()
+{
+    ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_LATCH, 1));
+    vTaskDelay(1 / portTICK_RATE_MS);
+    ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_LATCH, 0));
+    vTaskDelay(1 / portTICK_RATE_MS);
+}
+
+void pulse_clock()
+{
+    // shift register to next bit to be read
+    ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_CLOCK, 1));
+    ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_CLOCK, 0));
 }
 
 void snes_init()
@@ -108,9 +100,7 @@ int snes_read_controller()
     // controller has to be sent a high/low latch before reading
     int new_register = SNES_REGISTER_DEFAULT;
     for (uint8_t i = 0; i < SNES_REGISTER_NUM_BITS; ++i) {
-        if (i != 0) {
-            snes_pulse_clock();
-        }
+        i == 0 ? pulse_latch() : pulse_clock();
         if (!gpio_get_level(PIN_SNES_DATA)) {
             new_register &= ~(1ULL << i);
         }

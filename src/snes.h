@@ -2,7 +2,9 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/timers.h>
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "rom/ets_sys.h"
@@ -11,7 +13,6 @@
 #define PIN_SNES_CLOCK CONFIG_SNES_CLOCK
 #define PIN_SNES_DATA  CONFIG_SNES_DATA
 
-#define SNES_DEBOUNCE_MS CONFIG_SNES_DEBOUNCE_MS
 #define SNES_REGISTER_DEFAULT 0xfff 
 #define SNES_NUM_BUTTONS 12
 #define SNES_REGISTER_NUM_BITS SNES_NUM_BUTTONS
@@ -64,8 +65,7 @@ static gpio_config_t io_confs[] = {
   },
 };
 
-int snes_register = SNES_REGISTER_DEFAULT;  // holds current button states
-int last_pressed_register = SNES_REGISTER_DEFAULT;  // last buttons pressed
+extern int snes_register;
 
 void snes_init();
 void snes_debug_print_register(int snes_register);
