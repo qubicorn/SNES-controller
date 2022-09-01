@@ -20,6 +20,9 @@
 #define SNES_LATCH_PULSE_WIDTH CONFIG_SNES_LATCH_PULSE_WIDTH
 
 #define SNES_TASK_STACK_SIZE 4096
+#define SNES_MIN_FREE_STACK_SIZE 1024
+
+extern const gpio_config_t io_confs[];
 
 // SNES controller bits
 enum snes_btn {
@@ -36,37 +39,7 @@ enum snes_btn {
   SNES_BTN_LT,
   SNES_BTN_RT
 };
-static const char *SNES_BUTTON_LABELS[] = {
-  "B",
-  "Y",
-  "SELECT",
-  "START",
-  "UP",
-  "DOWN",
-  "LEFT",
-  "RIGHT",
-  "A",
-  "X",
-  "LT",
-  "RT"
-};
-
-static gpio_config_t io_confs[] = {
-  {
-    .mode = GPIO_MODE_OUTPUT,
-    .pin_bit_mask = 1ULL << PIN_SNES_LATCH,
-  },
-  {
-    .mode = GPIO_MODE_OUTPUT,
-    .pin_bit_mask = 1ULL << PIN_SNES_CLOCK,
-  },
-  {
-    .mode = GPIO_MODE_INPUT,
-    .pin_bit_mask = 1ULL << PIN_SNES_DATA,
-    .pull_up_en = GPIO_PULLUP_ENABLE,
-  },
-};
-
+extern const char *SNES_BUTTON_LABELS[];
 extern int snes_register;
 
 void snes_init();

@@ -3,9 +3,40 @@
 static const char *TAG = "SNES";
 
 // low stack space warning
-#define MIN_STACK_ALARM_BS 2000
-#define MIN_STACK_ALARM_TIMEOUT 1000
+static const int MIN_STACK_ALARM_TIMEOUT = 1000;
 int minStackAlarmTimeout = 0;
+bool debug = false;
+
+const char *SNES_BUTTON_LABELS[] = {
+  "B",
+  "Y",
+  "SELECT",
+  "START",
+  "UP",
+  "DOWN",
+  "LEFT",
+  "RIGHT",
+  "A",
+  "X",
+  "LT",
+  "RT"
+};
+
+const gpio_config_t io_confs[] = {
+  {
+    .mode = GPIO_MODE_OUTPUT,
+    .pin_bit_mask = 1ULL << PIN_SNES_LATCH,
+  },
+  {
+    .mode = GPIO_MODE_OUTPUT,
+    .pin_bit_mask = 1ULL << PIN_SNES_CLOCK,
+  },
+  {
+    .mode = GPIO_MODE_INPUT,
+    .pin_bit_mask = 1ULL << PIN_SNES_DATA,
+    .pull_up_en = GPIO_PULLUP_ENABLE,
+  },
+};
 
 int snes_register = SNES_REGISTER_DEFAULT;
 
@@ -84,14 +115,36 @@ int IRAM_ATTR snes_read_controller()
 
 void IRAM_ATTR task_snes_read() {
     while (true) {
-        snes_read_controller();
+        int snes_register = snes_read_controller();
         int stackSpace = uxTaskGetStackHighWaterMark(NULL);
-        if (stackSpace < MIN_STACK_ALARM_BS) {
+        if (stackSpace < SNES_MIN_FREE_STACK_SIZE) {
             if (minStackAlarmTimeout-- <= 0) {
                 minStackAlarmTimeout = MIN_STACK_ALARM_TIMEOUT;
                 ESP_LOGW(TAG, "available stack space is low (%d)", stackSpace);
             }
         };
+
+        // Debug combos
+        if (esp_log_level_get(TAG) >= ESP_LOG_DEBUG && snes_register != SNES_REGISTER_DEFAULT) {
+            int stack_combo = 1<<SNES_BTN_RT | 1<<SNES_BTN_LT;
+            if ((~snes_register & stack_combo) == stack_combo) {
+                ESP_LOGI(TAG, "available stack space: %d", stackSpace);
+
+                //poor man's debounce
+                vTaskDelay(50);
+                continue;
+            }
+
+            int debug_combo = 1<<SNES_BTN_START;
+            if ((~snes_register & debug_combo) == debug_combo) {
+                debug = !debug;
+                ESP_LOGI(TAG, "debug mode: %s", (debug ? "ON" : "OFF"));
+
+                //poor man's debounce
+                vTaskDelay(50);
+                continue;
+            }
+        }
     }
 }
 

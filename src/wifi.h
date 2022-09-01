@@ -15,8 +15,4 @@
 #define WIFI_PASSWORD  CONFIG_ESP_WIFI_PASSWORD
 #define WIFI_MAX_RETRY CONFIG_ESP_WIFI_MAX_RETRY
 
-static EventGroupHandle_t wifi_event_group;
-static StaticEventGroup_t _static_wifi_event_group;
-static int connect_retry_num = 0;
-
 void wifi_init();
