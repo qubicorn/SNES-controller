@@ -89,7 +89,6 @@ int IRAM_ATTR snes_read_controller()
 
 void IRAM_ATTR task_snes_read() {
     while (true) {
-        int snes_register = snes_read_controller();
-        vTaskDelay(10 / portTICK_RATE_MS);
+        snes_read_controller();
     }
 }
