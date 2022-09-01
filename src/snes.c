@@ -5,6 +5,7 @@ int snes_register = SNES_REGISTER_DEFAULT;
 
 #define NUM_TIMERS 1
 TimerHandle_t xTimers[NUM_TIMERS];
+static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 
 void gpio_init()
@@ -23,7 +24,7 @@ void vTimerCallback(TimerHandle_t pxTimer) {
 void timer_init() {
     for (int32_t i=0; i < NUM_TIMERS; ++i) {
         xTimers[i] = xTimerCreate("snes_timer",       // Just a text name, not used by the kernel.
-                                  1,         // The timer period in ticks.
+                                  20,             // The timer period in ticks.
                                   pdTRUE,        // The timers will auto-reload themselves when they expire.
                                   (void *)i,     // Assign each timer a unique id equal to its array index.
                                   vTimerCallback // Each timer calls the same callback when it expires.
@@ -95,8 +96,9 @@ void snes_debug_print_register(int snes_register)
     }
 }
 
-int snes_read_controller()
+int IRAM_ATTR snes_read_controller()
 {
+    taskENTER_CRITICAL_ISR(&spinlock);
     // controller has to be sent a high/low latch before reading
     int new_register = SNES_REGISTER_DEFAULT;
     for (uint8_t i = 0; i < SNES_REGISTER_NUM_BITS; ++i) {
@@ -105,6 +107,8 @@ int snes_read_controller()
             new_register &= ~(1ULL << i);
         }
     }
+    portEXIT_CRITICAL_ISR(&spinlock);
+
     if (new_register == 0) {
         ESP_LOGW(TAG, "no data signal coming from yellow SNES controller wire");
         return 0;
