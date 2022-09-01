@@ -22,4 +22,14 @@ void app_main() {
     wifi_init();
     
     snes_init();
+    // start snes task
+    const uint32_t stackDepth = 5 * configMINIMAL_STACK_SIZE;
+    TaskHandle_t xHandle;
+    void *param = NULL;
+    BaseType_t taskCreated;
+
+    taskCreated = xTaskCreate(task_snes_read, "TASK_SNES", stackDepth, param, tskIDLE_PRIORITY, &xHandle);
+    if (taskCreated != pdPASS) {
+        ESP_LOGE("MAIN", "Failed to create snes task");
+    }
 }

@@ -69,4 +69,5 @@ extern int snes_register;
 
 void snes_init();
 void snes_debug_print_register(int snes_register);
-int snes_read_controller();
+int IRAM_ATTR snes_read_controller();
+void IRAM_ATTR task_snes_read();

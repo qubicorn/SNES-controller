@@ -3,11 +3,6 @@
 static const char *TAG = "SNES";
 int snes_register = SNES_REGISTER_DEFAULT;
 
-#define NUM_TIMERS 1
-TimerHandle_t xTimers[NUM_TIMERS];
-static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
-
-
 void gpio_init()
 {
     size_t num_gpio_confs = sizeof(io_confs) / sizeof(gpio_config_t);
@@ -17,33 +12,7 @@ void gpio_init()
     ESP_LOGI(TAG, "gpio ports initialized");
 }
 
-void vTimerCallback(TimerHandle_t pxTimer) {
-    snes_register = snes_read_controller();
-}
-
-void timer_init() {
-    for (int32_t i=0; i < NUM_TIMERS; ++i) {
-        xTimers[i] = xTimerCreate("snes_timer",       // Just a text name, not used by the kernel.
-                                  20,             // The timer period in ticks.
-                                  pdTRUE,        // The timers will auto-reload themselves when they expire.
-                                  (void *)i,     // Assign each timer a unique id equal to its array index.
-                                  vTimerCallback // Each timer calls the same callback when it expires.
-        );
-
-        if (xTimers[i] == NULL) {
-            ESP_LOGE(TAG, "Failed to create timer");
-        } else {
-            // Start the timer.  No block time is specified, and even if one was
-            // it would be ignored because the scheduler has not yet been
-            // started.
-            if (xTimerStart(xTimers[i], 0) != pdPASS) {
-                ESP_LOGE(TAG, "Failed to activate timer");
-            }
-        }
-    }
-}
-
-void pulse_latch()
+void IRAM_ATTR pulse_latch()
 {
     ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_LATCH, 1));
     vTaskDelay(1 / portTICK_RATE_MS);
@@ -51,7 +20,7 @@ void pulse_latch()
     vTaskDelay(1 / portTICK_RATE_MS);
 }
 
-void pulse_clock()
+void IRAM_ATTR pulse_clock()
 {
     // shift register to next bit to be read
     ESP_ERROR_CHECK(gpio_set_level(PIN_SNES_CLOCK, 1));
@@ -61,7 +30,6 @@ void pulse_clock()
 void snes_init()
 {
     gpio_init();
-    timer_init();
 }
 
 char *register_to_binary(int snes_register, char *bin_snes_register)
@@ -98,7 +66,6 @@ void snes_debug_print_register(int snes_register)
 
 int IRAM_ATTR snes_read_controller()
 {
-    taskENTER_CRITICAL_ISR(&spinlock);
     // controller has to be sent a high/low latch before reading
     int new_register = SNES_REGISTER_DEFAULT;
     for (uint8_t i = 0; i < SNES_REGISTER_NUM_BITS; ++i) {
@@ -107,7 +74,6 @@ int IRAM_ATTR snes_read_controller()
             new_register &= ~(1ULL << i);
         }
     }
-    portEXIT_CRITICAL_ISR(&spinlock);
 
     if (new_register == 0) {
         ESP_LOGW(TAG, "no data signal coming from yellow SNES controller wire");
@@ -118,6 +84,12 @@ int IRAM_ATTR snes_read_controller()
     if (esp_log_level_get(TAG) >= ESP_LOG_DEBUG && new_register != SNES_REGISTER_DEFAULT) {
         snes_debug_print_register(new_register);
     }
-
     return new_register;
+}
+
+void IRAM_ATTR task_snes_read() {
+    while (true) {
+        int snes_register = snes_read_controller();
+        vTaskDelay(10 / portTICK_RATE_MS);
+    }
 }
