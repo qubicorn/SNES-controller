@@ -1,26 +1,33 @@
 #include "snes.h"
 
+#define PIN_SNES_LATCH CONFIG_SNES_LATCH
+#define PIN_SNES_CLOCK CONFIG_SNES_CLOCK
+#define PIN_SNES_DATA  CONFIG_SNES_DATA
+
+#define SNES_REGISTER_DEFAULT 0xfff 
+#define SNES_NUM_BUTTONS 12
+#define SNES_REGISTER_NUM_BITS SNES_NUM_BUTTONS
+#define SNES_POLLILNG_RATE CONFIG_SNES_POLLILNG_RATE
+#define SNES_LATCH_PULSE_WIDTH CONFIG_SNES_LATCH_PULSE_WIDTH
+
+#define SNES_TASK_STACK_SIZE 4096
+#define SNES_MIN_FREE_STACK_SIZE 1024
+
+
 static const char *TAG = "SNES";
 
-// low stack space warning
-static const int MIN_STACK_ALARM_TIMEOUT = 1000;
-int minStackAlarmTimeout = 0;
-bool debug = false;
+// Each button combo group has a set of combos with function callbacks
+#define COMBO_GROUP_MAIN 0
+#define COMBO_GROUP_DEBUG 1
+#define COMBO_GROUPS_MAX 5 // max number of groups
+#define COMBOS_MAX 20 // max number of combos per group
+static int combo_groups_active = 0;
+static int combo_count[COMBO_GROUPS_MAX]; // current number of combos in each group
+static int combo_masks[COMBO_GROUPS_MAX][COMBOS_MAX];
 
-const char *SNES_BUTTON_LABELS[] = {
-  "B",
-  "Y",
-  "SELECT",
-  "START",
-  "UP",
-  "DOWN",
-  "LEFT",
-  "RIGHT",
-  "A",
-  "X",
-  "LT",
-  "RT"
-};
+// combo callbacks
+typedef void (*f_snes_btn_combo)(void);
+static f_snes_btn_combo f_combos[COMBO_GROUPS_MAX][COMBOS_MAX];
 
 const gpio_config_t io_confs[] = {
   {
@@ -38,8 +45,39 @@ const gpio_config_t io_confs[] = {
   },
 };
 
-int snes_register = SNES_REGISTER_DEFAULT;
+// low stack space warning
+static const int MIN_STACK_ALARM_TIMEOUT = 1000;
+int minStackAlarmTimeout = 0;
 
+// SNES controller bits
+enum snes_btn {
+  SNES_BTN_B,
+  SNES_BTN_Y,
+  SNES_BTN_SELECT,
+  SNES_BTN_START,
+  SNES_BTN_UP,
+  SNES_BTN_DOWN,
+  SNES_BTN_LEFT,
+  SNES_BTN_RIGHT,
+  SNES_BTN_A,
+  SNES_BTN_X,
+  SNES_BTN_LT,
+  SNES_BTN_RT
+};
+const char *SNES_BUTTON_LABELS[] = {
+  "B",
+  "Y",
+  "SELECT",
+  "START",
+  "UP",
+  "DOWN",
+  "LEFT",
+  "RIGHT",
+  "A",
+  "X",
+  "LT",
+  "RT"
+};
 
 
 void IRAM_ATTR pulse_latch()
@@ -89,7 +127,7 @@ void snes_debug_print_register(int snes_register)
     }
 }
 
-int IRAM_ATTR snes_read_controller()
+int IRAM_ATTR read_controller()
 {
     // latch to capture state and then clock pulse to retrieve each bit
     int new_register = SNES_REGISTER_DEFAULT;
@@ -112,51 +150,80 @@ int IRAM_ATTR snes_read_controller()
     return new_register;
 }
 
+void check_free_stack_space() {
+    int stackSpace = uxTaskGetStackHighWaterMark(NULL);
+    if (stackSpace < SNES_MIN_FREE_STACK_SIZE) {
+        if (minStackAlarmTimeout-- <= 0) {
+            minStackAlarmTimeout = MIN_STACK_ALARM_TIMEOUT;
+            ESP_LOGW(TAG, "available stack space is low (%d)", stackSpace);
+        }
+    };
+}
 
-void IRAM_ATTR task_snes_read() {
-    while (true) {
-        int snes_register = snes_read_controller();
-        int stackSpace = uxTaskGetStackHighWaterMark(NULL);
-        if (stackSpace < SNES_MIN_FREE_STACK_SIZE) {
-            if (minStackAlarmTimeout-- <= 0) {
-                minStackAlarmTimeout = MIN_STACK_ALARM_TIMEOUT;
-                ESP_LOGW(TAG, "available stack space is low (%d)", stackSpace);
-            }
-        };
+void debug_toggle() {
+    combo_groups_active ^= 1<<COMBO_GROUP_DEBUG;
+    bool is_debug = (combo_groups_active & 1<<COMBO_GROUP_DEBUG);
+    ESP_LOGI(TAG, "debug mode: %s", is_debug ? "ON" : "OFF");
+}
+void debug_stack() {
+    int stackSpace = uxTaskGetStackHighWaterMark(NULL);
+    ESP_LOGI(TAG, "available stack space: %d", stackSpace);
+}
 
-        // Debug combos
-        if (esp_log_level_get(TAG) >= ESP_LOG_DEBUG && snes_register != SNES_REGISTER_DEFAULT) {
-            int stack_combo = 1<<SNES_BTN_RT | 1<<SNES_BTN_LT;
-            if ((~snes_register & stack_combo) == stack_combo) {
-                ESP_LOGI(TAG, "available stack space: %d", stackSpace);
+void add_combo(int group, int btn_mask, f_snes_btn_combo cb) {
+    int combo = combo_count[group];
+    if (group >= COMBO_GROUPS_MAX) {
+        ESP_LOGE(TAG, "tried to use group id %d but max is %d",
+            group,
+            COMBO_GROUPS_MAX - 1
+        );
+        return;
+    }
+    if (combo >= COMBOS_MAX) {
+        char bin[SNES_REGISTER_NUM_BITS];
+        ESP_LOGE(TAG, "attempted to add too many combos (group: %d, btn_mask: %s)",
+            group, register_to_binary(combo, bin)
+        );
+        return;
+    }
 
-                //poor man's debounce
-                vTaskDelay(50);
-                continue;
-            }
+    combo_masks[group][combo] = btn_mask;
+    f_combos[group][combo] = cb;
+    ++combo_count[group];
+}
 
-            int debug_combo = 1<<SNES_BTN_START;
-            if ((~snes_register & debug_combo) == debug_combo) {
-                debug = !debug;
-                ESP_LOGI(TAG, "debug mode: %s", (debug ? "ON" : "OFF"));
+void enable_combo_group(int group_mask) {
+    combo_groups_active |= 1<<group_mask;
+}
 
-                //poor man's debounce
-                vTaskDelay(50);
-                continue;
+void disable_combo_group(int group_mask) {
+    combo_groups_active &= ~(1<<group_mask);
+}
+
+void combo_detect(int snes_register) {
+    if (snes_register == SNES_REGISTER_DEFAULT) {
+        return;
+    }
+
+    for (int group=0; group < COMBO_GROUPS_MAX; ++group) {
+        if ((combo_groups_active & 1<<group) == 0) continue;
+        if (combo_count[group] == 0) continue;
+
+        for (int combo=0; combo < combo_count[group]; ++combo) {
+            int combo_mask = combo_masks[group][combo];
+            if ((~snes_register & combo_mask) == combo_mask) {
+                (*f_combos[group][combo])();
+                vTaskDelay(50); // debounce
             }
         }
     }
 }
 
-void start_task() {
-    TaskHandle_t xHandle;
-    void *param = NULL;
-    BaseType_t taskCreated;
-
-    ESP_LOGI(TAG, "creating SNES task with %d bytes of memory", SNES_TASK_STACK_SIZE);
-    taskCreated = xTaskCreate(task_snes_read, "TASK_SNES", SNES_TASK_STACK_SIZE, param, tskIDLE_PRIORITY, &xHandle);
-    if (taskCreated != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create snes task");
+void IRAM_ATTR task_read_input() {
+    while (true) {
+        check_free_stack_space();
+        int snes_register = read_controller();
+        combo_detect(snes_register);
     }
 }
 
@@ -169,8 +236,30 @@ void gpio_init()
     ESP_LOGI(TAG, "gpio ports initialized");
 }
 
+void combo_init()
+{
+    add_combo(COMBO_GROUP_MAIN, 1<<SNES_BTN_START | 1<<SNES_BTN_UP, debug_toggle);
+    add_combo(COMBO_GROUP_DEBUG, 1<<SNES_BTN_LT | 1<<SNES_BTN_RT, debug_stack);
+
+    enable_combo_group(COMBO_GROUP_MAIN);
+    enable_combo_group(COMBO_GROUP_DEBUG);
+}
+
+void start_task() {
+    TaskHandle_t xHandle;
+    void *param = NULL;
+    BaseType_t taskCreated;
+
+    ESP_LOGI(TAG, "creating SNES task with %d bytes of memory", SNES_TASK_STACK_SIZE);
+    taskCreated = xTaskCreate(task_read_input, "SNES_INPUT", SNES_TASK_STACK_SIZE, param, tskIDLE_PRIORITY, &xHandle);
+    if (taskCreated != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create snes task");
+    }
+}
+
 void snes_init()
 {
     gpio_init();
+    combo_init();
     start_task();
 }

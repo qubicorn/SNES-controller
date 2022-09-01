@@ -16,9 +16,7 @@ void app_main() {
     esp_log_level_set("*", ESP_LOG_ERROR);
     esp_log_level_set("SNES", ESP_LOG_DEBUG);
 
-    gpio_init();    
     nvs_flash_init();
-    
     wifi_init();
     snes_init();
 }
