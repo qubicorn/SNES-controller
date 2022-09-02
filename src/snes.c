@@ -242,7 +242,6 @@ void combo_init()
     add_combo(COMBO_GROUP_DEBUG, 1<<SNES_BTN_LT | 1<<SNES_BTN_RT, debug_stack);
 
     enable_combo_group(COMBO_GROUP_MAIN);
-    enable_combo_group(COMBO_GROUP_DEBUG);
 }
 
 void start_task() {
