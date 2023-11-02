@@ -165,6 +165,7 @@ void debug_toggle() {
     bool is_debug = (combo_groups_active & 1<<COMBO_GROUP_DEBUG);
     ESP_LOGI(TAG, "debug mode: %s", is_debug ? "ON" : "OFF");
 }
+
 void debug_stack() {
     int stackSpace = uxTaskGetStackHighWaterMark(NULL);
     ESP_LOGI(TAG, "available stack space: %d", stackSpace);

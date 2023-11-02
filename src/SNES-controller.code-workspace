@@ -14,7 +14,8 @@
 			"wifi.h": "c",
 			"esp_system.h": "c",
 			"snes.h": "c",
-			"ets_sys.h": "c"
+			"ets_sys.h": "c",
+			"nvs_flash.h": "c"
 		}
 	}
 }
