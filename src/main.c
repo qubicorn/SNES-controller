@@ -10,6 +10,8 @@
 #include "wifi.h"
 #include "snes.h"
 
+#include "http_stuff.h"
+
 const char *TAG = "MAIN";
 
 void app_main() {
@@ -19,4 +21,5 @@ void app_main() {
     nvs_flash_init();
     wifi_init();
     snes_init();
+    http_get_request();
 }
