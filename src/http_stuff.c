@@ -1,6 +1,7 @@
 #include "http_stuff.h"
 
 #define CONFIG_EXAMPLE_HTTP_ENDPOINT "10.0.0.50"
+#define CONFIG_EXAMPLE_HTTP_PORT 8032
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 static const char *TAG = "HTTP_CLIENT";
@@ -97,7 +98,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-static void http_rest_with_url(void)
+void http_post_kv(char *k, int v)
 {
     // Declare local_response_buffer with size (MAX_HTTP_OUTPUT_BUFFER + 1) to prevent out of bound access when
     // it is used by functions like strlen(). The buffer should only be used upto size MAX_HTTP_OUTPUT_BUFFER
@@ -109,31 +110,30 @@ static void http_rest_with_url(void)
      */
     esp_http_client_config_t config = {
         .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
-        .path = "/index.html",
-        .port = 8032,
-        .query = "esp",
+        .port = CONFIG_EXAMPLE_HTTP_PORT,
+        .path = "/write",
         .event_handler = _http_event_handler,
         .user_data = local_response_buffer,        // Pass address of local buffer to get response
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
-    // GET
+    // POST
+    char *post_data = NULL;
+    if (0 > asprintf(&post_data, "{\"%s\":\"%d\"}", k, v)) {
+        post_data = NULL;
+    }
+    ESP_LOGI(TAG, "post_data: %s", post_data);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, post_data, strlen(post_data));
     esp_err_t err = esp_http_client_perform(client);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP GET Status = %d", esp_http_client_get_status_code(client));
-        //         esp_http_client_get_content_length(client));
-        // ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %"PRId64,
-        //         esp_http_client_get_status_code(client),
-        //         esp_http_client_get_content_length(client));
+        ESP_LOGI(TAG, "HTTP POST Status = %d", esp_http_client_get_status_code(client));
     } else {
-        ESP_LOGE(TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
     }
-    ESP_LOG_BUFFER_HEX(TAG, local_response_buffer, strlen(local_response_buffer));
 
+    free(post_data);
     esp_http_client_cleanup(client);
-}
-
-void http_get_request(void) {
-    http_rest_with_url();
 }

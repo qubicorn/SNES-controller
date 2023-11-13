@@ -9,4 +9,6 @@
 #include "esp_timer.h"
 #include "rom/ets_sys.h"
 
+#include "http_stuff.h"
+
 void snes_init();

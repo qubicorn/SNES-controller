@@ -10,7 +10,8 @@
 #define SNES_POLLILNG_RATE CONFIG_SNES_POLLILNG_RATE
 #define SNES_LATCH_PULSE_WIDTH CONFIG_SNES_LATCH_PULSE_WIDTH
 
-#define SNES_TASK_STACK_SIZE 4096
+//#define SNES_TASK_STACK_SIZE 4096
+#define SNES_TASK_STACK_SIZE 8192
 #define SNES_MIN_FREE_STACK_SIZE 1024
 
 
@@ -164,6 +165,8 @@ void debug_toggle() {
     combo_groups_active ^= 1<<COMBO_GROUP_DEBUG;
     bool is_debug = (combo_groups_active & 1<<COMBO_GROUP_DEBUG);
     ESP_LOGI(TAG, "debug mode: %s", is_debug ? "ON" : "OFF");
+    http_post_kv("debug_mode", (int)is_debug);
+
 }
 
 void debug_stack() {
