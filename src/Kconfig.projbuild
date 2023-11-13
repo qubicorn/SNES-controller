@@ -32,4 +32,15 @@ menu "Project config"
         int "GPIO Input for SNES data"
         default "17"
 
+    config HTTP_BACKEND_HOST
+        string "HTTP Backend Host"
+        default "10.0.0.50"
+        help
+            Host of backend server
+    config HTTP_BACKEND_PORT
+        int "HTTP Backend PORT"
+        default 8032
+        help
+            Port of backend server
+
 endmenu

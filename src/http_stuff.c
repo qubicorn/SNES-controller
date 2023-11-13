@@ -1,7 +1,7 @@
 #include "http_stuff.h"
 
-#define CONFIG_EXAMPLE_HTTP_ENDPOINT "10.0.0.50"
-#define CONFIG_EXAMPLE_HTTP_PORT 8032
+#define HTTP_BACKEND_HOST CONFIG_HTTP_BACKEND_HOST
+#define HTTP_BACKEND_PORT CONFIG_HTTP_BACKEND_PORT
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 static const char *TAG = "HTTP_CLIENT";
@@ -109,8 +109,8 @@ void http_post_kv(char *k, int v)
      * If URL as well as host and path parameters are specified, values of host and path will be considered.
      */
     esp_http_client_config_t config = {
-        .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
-        .port = CONFIG_EXAMPLE_HTTP_PORT,
+        .host = HTTP_BACKEND_HOST,
+        .port = HTTP_BACKEND_PORT,
         .path = "/write",
         .event_handler = _http_event_handler,
         .user_data = local_response_buffer,        // Pass address of local buffer to get response
