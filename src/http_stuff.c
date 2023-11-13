@@ -117,23 +117,25 @@ void http_post_kv(char *k, int v)
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_err_t err;
 
     // POST
     char *post_data = NULL;
-    if (0 > asprintf(&post_data, "{\"%s\":\"%d\"}", k, v)) {
+    //if (0 > asprintf(&post_data, "{\"%s\":\"%d\"}", k, v)) {
+    if (0 > asprintf(&post_data, "%s=%d", k, v)) {
         post_data = NULL;
     }
     ESP_LOGI(TAG, "post_data: %s", post_data);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
-    esp_err_t err = esp_http_client_perform(client);
+    err = esp_http_client_perform(client);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "HTTP POST Status = %d", esp_http_client_get_status_code(client));
     } else {
         ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
     }
 
-    free(post_data);
     esp_http_client_cleanup(client);
+    free(post_data);
 }
